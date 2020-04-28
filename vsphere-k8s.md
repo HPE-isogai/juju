@@ -120,11 +120,27 @@ juju add-unit kubernetes-worker --to 2
 juju ssh 2 sudo lsmod |grep nvidia  # Confirm roading driver
 ```
 # Deploy Kubeflow
-## Add Persistent Storage for Kubeflow statefull workload
-
+## Add Persistent StorageClass for Kubeflow statefull workload
 1. Add StrageClass
+
+## Deploy Kubeflow
 1. Deploy Kubeflow
   Follow this instruction
   https://www.kubeflow.org/docs/started/k8s/kfctl-k8s-istio/
+  * If you care corporate proxy, follow below instruction
+  https://github.com/kubeflow/kfctl/issues/237
 
+## Add PersistentVolumeClaim
 
+| namespace | vpc name | size |
+| --- | --- | --- |
+| kubeflow | katib-mysql | 10Gi |
+| kubeflow | metadata-mysql | 10Gi |
+| kubeflow | minio-pv-claim | 20Gi |
+| kubeflow | mysql-pv-claim | 20Gi |
+
+## Access Kubeflow Dashboard
+TBD
+
+## Deploy Notebook with GPU instance
+TBD
