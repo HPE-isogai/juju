@@ -11,20 +11,19 @@ This tutorial k8s bundle include loadbalancer, Certificate Authority(EasyRSA), c
 
 - DNS
   - Name resolution entry
-
 | hostname | description |
 | --- | --- |
 | vcenter host fqdn |  |
 | esxi host fqdn | |
-
   - Confirm DNS settings
     - System-resolv --status
        --Check DNS settings
        --Check name resolution by `dig` with vcenter, esxi, and some URL on internet
               
 - DHCP
-  - DeployされるマシンはvCenterにルーティング可能なこと
-  - dhcp配布されるアドレスがDNSで名前解決できること
+  - Bootstrap Machines deployed by juju can reach to vCenter 
+  - DNS settings can be distributed by DHCP if needed
+  - DNS name can be resolved for dhcp'ed IP address
 
 - Juju Client Network
   - Connect to internet
@@ -47,10 +46,14 @@ This tutorial k8s bundle include loadbalancer, Certificate Authority(EasyRSA), c
 ## juju client base os
 1. Create virtual machine for juju client  
 1. Install Ubuntu  
-1. Configure OS settings  
+1. Configure OS settings / Install packages
 - apt-get update && apt-get upgrade  
 - sudoers (NOPASSWD, Optional)  
 - Proxy setting (.bashrc)  
+- Install juju
+```
+sudo snap install juju --classic
+```
 
 ## juju k8s deploy 1 master x 1 worker
 1. Add Cloud
