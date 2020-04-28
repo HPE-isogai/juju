@@ -1,4 +1,4 @@
-# Kubeflow with juju
+# Kubeflow with juju x vSphere
 ## Overview
 This procedure describe procedures of deploying belwo k8s cluster;
 - 1 master, 1 worker and 1 worker with GPU
