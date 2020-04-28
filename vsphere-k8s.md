@@ -11,18 +11,17 @@ This tutorial k8s bundle include loadbalancer, Certificate Authority(EasyRSA), c
 
 - DNS
   - Name resolution entry
-```
-  hostname                   description
-  -------------------------- ----------------
-  vcenter.vsphere.local      vCenter server
-  pesxiknl01.vsphere.local   ESXi \#1
-  pesxiknl02.vsphere.local   ESXi \#2
-  URL on Internet            
-```
 
-  - System-resolv
-     --statusでDNSが正しくセットされていること、上記の名前が解決できることを確認
+| hostname | description |
+| --- | --- |
+| vcenter host fqdn |  |
+| esxi host fqdn | |
 
+  - Confirm DNS settings
+    - System-resolv --status
+       --Check DNS settings
+       --Check name resolution by `dig` with vcenter, esxi, and some URL on internet
+              
 - DHCP
   - DeployされるマシンはvCenterにルーティング可能なこと
   - dhcp配布されるアドレスがDNSで名前解決できること
@@ -38,13 +37,12 @@ This tutorial k8s bundle include loadbalancer, Certificate Authority(EasyRSA), c
   curl http://\<some-internal-web-server\> --head --v 　#Internal Connection, make sure 200 OK
 ```
 
-**※no\_proxy
-(Ubuntu側のプロキシ除外変数)にCIDR（/24等）を設定した場合、curl/wgetは効くがno-proxy（jujuの変数）には効かない**
-
-**no-proxyには以下のようにすべてのアドレスを指定する\
+**no_proxy (Ubutu OS proxy setting) with CIDR address, curl/wget works
+**no-proxy (juju proxy env) with CIDR address doesn't work, so specify all address like below
 ```
   **export no-proxy=\"\`echo 10.1.1.{1..254},\` 10.1.1.255\"**
 ```
+
 # Procedure
 ## juju client base os
 1. Create virtual machine for juju client  
@@ -57,13 +55,15 @@ This tutorial k8s bundle include loadbalancer, Certificate Authority(EasyRSA), c
 ## juju k8s deploy 1 master x 1 worker
 1. Add Cloud
 
-`juju add-cloud \--local  
-`juju add-credential vsphere  
-
+`juju add-cloud \--local`  
+  - add vsphere
+`juju add-credential vsphere`  
+  - add credential information for your vSphere enviroment
+  
 1. Create bootstrap.conf
 ```
-primary-network: InternalNetworkVM  # Network for 
-datastore: datastore2               # 
+primary-network: InternalNetworkVM  # Network for machines that are deployed with juju
+datastore: datastore2               # Datastores for machines / ova files that are used by bootstrap / machines
 ```
 1. Create Controller VM by bootstrap command
 
@@ -71,8 +71,111 @@ datastore: datastore2               #
 juju bootstrap vsphere vsphere-00 --config bootstrap.conf --show-log
 ```
 1. Create bundle.yaml
+<details>
+  <summary> bundle.yaml </summary>
+    
 ```
+description: For demo purpose, 1 master + GPU workers Kubernetes cluster.
+machines:
+  "0":
+    constraints: cores=2 mem=8G root-disk=32G
+  "1":
+    constraints: cores=4 mem=16G root-disk=64G
+series: bionic
+services:
+  calico:
+    annotations:
+      gui-x: '475'
+      gui-y: '605'
+    charm: cs:~containers/calico
+    options:
+      cidr: 172.16.0.0/16
+  containerd:
+    annotations:
+      gui-x: '475'
+      gui-y: '800'
+    charm: cs:~containers/containerd-46
+  easyrsa:
+    annotations:
+      gui-x: '90'
+      gui-y: '420'
+    charm: cs:~containers/easyrsa-289
+    constraints: root-disk=8G
+    num_units: 1
+    to:
+      - '0'
+  etcd:
+    annotations:
+      gui-x: '800'
+      gui-y: '420'
+    charm: cs:~containers/etcd-478
+    constraints: root-disk=8G
+    num_units: 1
+    options:
+      channel: 3.2/stable
+    to:
+      - '0'
+  kubeapi-load-balancer:
+    annotations:
+      gui-x: '450'
+      gui-y: '250'
+    charm: cs:~containers/kubeapi-load-balancer-695
+    constraints: root-disk=8G
+    expose: true
+    num_units: 1
+    to:
+      - '0'
+  kubernetes-master:
+    annotations:
+      gui-x: '800'
+      gui-y: '850'
+    charm: cs:~containers/kubernetes-master-746
+    constraints: cores=2 mem=8G root-disk=32G
+    num_units: 1
+    to:
+      - '0'
+  kubernetes-worker:
+    annotations:
+      gui-x: '90'
+      gui-y: '850'
+    charm: cs:~containers/kubernetes-worker-588
+    constraints: cores=4 mem=16G root-disk=64G
+    expose: true
+    num_units: 1
+    to:
+      - '1'
+relations:
+- - kubernetes-master:kube-api-endpoint
+  - kubeapi-load-balancer:apiserver
+- - kubernetes-master:loadbalancer
+  - kubeapi-load-balancer:loadbalancer
+- - kubernetes-master:kube-control
+  - kubernetes-worker:kube-control
+- - kubernetes-master:certificates
+  - easyrsa:client
+- - etcd:certificates
+  - easyrsa:client
+- - kubernetes-master:etcd
+  - etcd:db
+- - kubernetes-worker:certificates
+  - easyrsa:client
+- - kubernetes-worker:kube-api-endpoint
+  - kubeapi-load-balancer:website
+- - kubeapi-load-balancer:certificates
+  - easyrsa:client
+- - calico:etcd
+  - etcd:db
+- - calico:cni
+  - kubernetes-master:cni
+- - calico:cni
+  - kubernetes-worker:cni
+- - containerd:containerd
+  - kubernetes-worker:container-runtime
+- - containerd:containerd
+  - kubernetes-master:container-runtime
 ```
+</details>
+
 1. Deploy bundle
 ```
 juju deploy ./bundle-k8s-1.15.11-calico.yaml
